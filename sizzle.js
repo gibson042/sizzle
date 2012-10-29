@@ -30,7 +30,6 @@ var cachedruns,
 	docElem = document.documentElement,
 	dirruns = 0,
 	done = 0,
-	pop = [].pop,
 	push = [].push,
 	slice = [].slice,
 	// Use a stripped-down indexOf if a native one is unavailable
@@ -627,19 +626,24 @@ Expr = Sizzle.selectors = {
 		"CHILD": function( type, argument, first, last ) {
 
 			if ( type === "nth" ) {
+				var doneName = done++;
+
 				return function( elem ) {
 					var node, diff,
-						parent = elem.parentNode;
+						childkey = dirruns + " " + doneName + " ",
+						sizset = elem.sizset;
 
 					if ( first === 1 && last === 0 ) {
 						return true;
 					}
 
-					if ( parent ) {
+					if ( typeof sizset === "string" && sizset.indexOf( childkey ) === 0 ) {
+						diff = sizset.slice( childkey.length );
+					} else if ( (node = elem.parentNode && elem.parentNode.firstChild) ) {
 						diff = 0;
-						for ( node = parent.firstChild; node; node = node.nextSibling ) {
+						for ( ; node; node = node.nextSibling ) {
 							if ( node.nodeType === 1 ) {
-								diff++;
+								node.sizset = childkey + (++diff);
 								if ( elem === node ) {
 									break;
 								}
@@ -1340,29 +1344,35 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 		bySet = setMatchers.length > 0,
 		byElement = elementMatchers.length > 0,
 		superMatcher = function( seed, context, xml, results, expandContext ) {
-			var elem, j, matcher,
-				setMatched = [],
-				matchedCount = 0,
-				i = "0",
+			var elem, i, j, matchedCount, matcher, sort,
+				elementMatched = [],
 				unmatched = seed && [],
+				setMatched = bySet && [],
 				outermost = expandContext != null,
 				contextBackup = outermostContext,
 				// We must always have either seed elements or context
 				elems = seed || byElement && Expr.find["TAG"]( "*", expandContext && context.parentNode || context ),
+				len = elems.length,
 				// Nested matchers should use non-integer dirruns
 				dirrunsUnique = (dirruns += contextBackup == null ? 1 : Math.E);
+
+			// Calculate length if necessary
+			if ( elems && typeof len !== "number" ) {
+				for ( len = 0; elems[len]; len++ ) {}
+			}
 
 			if ( outermost ) {
 				outermostContext = context !== document && context;
 				cachedruns = matcherCachedRuns;
 			}
 
-			// Add elements passing elementMatchers directly to results
-			for ( ; (elem = elems[i]) != null; i++ ) {
-				if ( byElement && elem ) {
+			// Find elements passing elementMatchers
+			i = matchedCount = len;
+			while ( i-- ) {
+				if ( (elem = elems[i]) && byElement ) {
 					for ( j = 0; (matcher = elementMatchers[j]); j++ ) {
 						if ( matcher( elem, context, xml ) ) {
-							results.push( elem );
+							elementMatched.push( elem );
 							break;
 						}
 					}
@@ -1379,7 +1389,7 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 						matchedCount--;
 					}
 
-					// Lengthen the array for every element, matched or not
+					// Lengthen the unmatched array for every element, matched or not
 					if ( seed ) {
 						unmatched.push( elem );
 					}
@@ -1387,36 +1397,41 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 			}
 
 			// Apply set filters to unmatched elements
-			// `i` starts as a string, so matchedCount would equal "00" if there are no elements
-			matchedCount += i;
-			if ( bySet && i !== matchedCount ) {
+			if ( matchedCount < len || bySet && !len ) {
+				if ( seed ) {
+					unmatched.reverse();
+				}
+
 				for ( j = 0; (matcher = setMatchers[j]); j++ ) {
 					matcher( unmatched, setMatched, context, xml );
 				}
 
+				// Handle element matches, requesting a sort only if necessary
 				if ( seed ) {
-					// Reintegrate element matches to eliminate the need for sorting
 					if ( matchedCount > 0 ) {
-						while ( i-- ) {
-							if ( !(unmatched[i] || setMatched[i]) ) {
-								setMatched[i] = pop.call( results );
+						// Reintegrate, respecting the reverse ordering
+						while ( len-- ) {
+							if ( !(unmatched[ len ] || setMatched[ len ]) ) {
+								setMatched[ len ] = elementMatched.shift();
 							}
 						}
 					}
 
-					// Discard index placeholder values to get only actual matches
+					// Condense to actual matches
 					setMatched = condense( setMatched );
+				} else {
+					// Add directly to results
+					push.apply( results, elementMatched.reverse() );
+
+					// Seedless set matches succeeding multiple successful matchers stipulate sorting
+					sort = outermost && setMatched.length && ( j + matchedCount ) > 1;
 				}
+			}
 
-				// Add matches to results
-				push.apply( results, setMatched );
-
-				// Seedless set matches succeeding multiple successful matchers stipulate sorting
-				if ( outermost && !seed && setMatched.length > 0 &&
-					( matchedCount + setMatchers.length ) > 1 ) {
-
-					Sizzle.uniqueSort( results );
-				}
+			// Add matches to results
+			push.apply( results, setMatched || elementMatched.reverse() );
+			if ( sort ) {
+				Sizzle.uniqueSort( results );
 			}
 
 			// Override manipulation of globals by nested matchers
