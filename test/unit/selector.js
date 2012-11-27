@@ -168,7 +168,7 @@ test("XML Document Selectors", function() {
 });
 
 test("broken", function() {
-	expect( 22 );
+	expect( 23 );
 
 	function broken( name, selector ) {
 		raises(function() {
@@ -191,6 +191,7 @@ test("broken", function() {
 	// Hangs on IE 9 if regular expression is inefficient
 	broken( "Broken Selector", "[id=012345678901234567890123456789");
 	broken( "Doesn't exist", ":visble" );
+	broken( "Unterminated :not", ":not(a" );
 	broken( "Nth-child", ":nth-child" );
 	// Sigh again. IE 9 thinks this is also a real selector
 	// not super critical that we fix this case

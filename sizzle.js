@@ -1578,6 +1578,11 @@ if ( document.querySelectorAll ) {
 			rbuggyQSA.push(",.*:");
 		});
 
+		assert(function( div ) {
+			div.querySelectorAll(":not(a");
+			rbuggyQSA.push(":not\\([^)]*$");
+		});
+
 		rbuggyQSA = new RegExp( rbuggyQSA.join("|") );
 
 		select = function( selector, context, results, seed, xml ) {
